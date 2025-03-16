@@ -1,0 +1,17 @@
+name: Windows Server
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Run basic commands
+      run: |
+        Write-Output "Windows Server is running!"
+        Get-ChildItem Env:
+        Start-Sleep -Seconds 300
