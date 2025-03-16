@@ -1,4 +1,4 @@
-name: Windows Server with RDP via playit.gg
+name: Run 9Hits Viewer in Terminal
 
 on:
   workflow_dispatch:
@@ -11,21 +11,25 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Enable RDP
+    - name: Download 9Hits Viewer 3.4
       run: |
-        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0 -ErrorAction Stop
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction Stop
-        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1 -ErrorAction Stop
-        Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd123" -Force) -ErrorAction Stop
-        Write-Output "RDP enabled successfully"
+        Invoke-WebRequest -Uri "https://www.mediafire.com/file/vx7re7ih4q8htz8/9hitsv3-win64.zip/file" -OutFile "9hitsviewer.zip" -ErrorAction Stop
+        Expand-Archive -Path "9hitsviewer.zip" -DestinationPath "." -Force
+        Write-Output "9Hits Viewer 3.4 downloaded and extracted"
+      shell: powershell
 
-    - name: Display connection info
+    - name: Run 9Hits Viewer
       run: |
-        Write-Output "Use your playit.gg tunnel address from the client (e.g., 123.45.67.89:54321)"
-        Write-Output "Username: runneradmin"
-        Write-Output "Password: P@ssw0rd123"
+        Start-Process -FilePath "./9HitsViewer.exe" -ArgumentList "--token ${{ secrets.NINEHITS_TOKEN }}" -NoNewWindow -RedirectStandardOutput "9hits.log" -RedirectStandardError "9hits_error.log"
+        Start-Sleep -Seconds 60 # Ждём 60 секунд для начального вывода
+        Write-Output "9Hits Viewer started. Output:"
+        Get-Content -Path "9hits.log" -ErrorAction SilentlyContinue
+        Write-Output "Errors (if any):"
+        Get-Content -Path "9hits_error.log" -ErrorAction SilentlyContinue
+      shell: powershell
 
     - name: Keep alive
       run: |
-        Write-Output "Server is running. Connect now!"
+        Write-Output "Server is running. 9Hits Viewer is working in the background."
         Start-Sleep -Seconds 21600 # 6 часов
+      shell: powershell
