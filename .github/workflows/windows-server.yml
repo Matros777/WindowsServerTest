@@ -21,7 +21,7 @@ jobs:
       run: |
         wsl --install -d Ubuntu-20.04 --quiet
         Write-Output "Ubuntu installed in WSL"
-      shell: cmd
+      shell: powershell
 
     - name: Set up WSL and Create Swap File
       run: |
