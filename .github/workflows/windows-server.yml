@@ -1,4 +1,4 @@
-name: Run 9Hits Viewer Linux in WSL
+name: Run 9Hits Viewer in Windows
 
 on:
   workflow_dispatch:
@@ -11,43 +11,18 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Enable WSL
+    - name: Download 9Hits Viewer from Google Drive
       run: |
-        Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart -ErrorAction Stop
-        Write-Output "WSL enabled"
-        # Проверяем, доступен ли WSL
-        wsl --list --all
+        Invoke-WebRequest -Uri "https://drive.google.com/uc?export=download&id=1c6njvmYU0C30isOSUEVZKcv8GXl6E0DH" -OutFile "9hitsviewer.zip" -ErrorAction Stop
+        Expand-Archive -Path "9hitsviewer.zip" -DestinationPath "." -Force -ErrorAction Stop
+        Write-Output "9Hits Viewer downloaded and extracted from Google Drive"
       shell: powershell
 
-    - name: Install Ubuntu in WSL
+    - name: Run 9Hits Viewer
       run: |
-        # Проверяем, установлены ли дистрибутивы
-        wsl --list --all
-        if (-not (wsl --list --all | Select-String "Ubuntu-20.04")) {
-          Write-Output "Installing Ubuntu-20.04..."
-          wsl --install -d Ubuntu-20.04 --quiet
-          Start-Sleep -Seconds 30 # Ждём завершения установки
-        } else {
-          Write-Output "Ubuntu-20.04 already installed"
-        }
-        wsl --list --all
-        Write-Output "Ubuntu installed in WSL"
-      shell: powershell
-
-    - name: Set up WSL and Create Swap File
-      run: |
-        wsl -d Ubuntu-20.04 -- bash -c "sudo apt update && sudo apt install -y curl"
-        wsl -d Ubuntu-20.04 -- bash -c "sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab"
-        wsl -d Ubuntu-20.04 -- bash -c "free -h > swap_info.txt"
-        Write-Output "Swap file created. Swap info:"
-        Get-Content -Path "swap_info.txt"
-      shell: powershell
-
-    - name: Install and Run 9Hits Viewer Linux
-      run: |
-        wsl -d Ubuntu-20.04 -- bash -c "curl -sSLk https://9hitste.github.io/install/3.0.4/linux.sh | sudo bash -s -- --token=dcd7ea6c4acdf7a3d50d78a50ee329a1 --system-session --allow-crypto=no > 9hits.log 2> 9hits_error.log &"
+        Start-Process -FilePath "./9HitsViewer.exe" -ArgumentList "--token ${{ secrets.NINEHITS_TOKEN }}" -NoNewWindow -RedirectStandardOutput "9hits.log" -RedirectStandardError "9hits_error.log"
         Start-Sleep -Seconds 60 # Ждём 60 секунд для вывода
-        Write-Output "9Hits Viewer Linux started. Output:"
+        Write-Output "9Hits Viewer started. Output:"
         Get-Content -Path "9hits.log" -ErrorAction SilentlyContinue
         Write-Output "Errors (if any):"
         Get-Content -Path "9hits_error.log" -ErrorAction SilentlyContinue
