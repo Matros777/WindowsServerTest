@@ -15,11 +15,22 @@ jobs:
       run: |
         Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart -ErrorAction Stop
         Write-Output "WSL enabled"
+        # Проверяем, доступен ли WSL
+        wsl --list --all
       shell: powershell
 
     - name: Install Ubuntu in WSL
       run: |
-        wsl --install -d Ubuntu-20.04 --quiet
+        # Проверяем, установлены ли дистрибутивы
+        wsl --list --all
+        if (-not (wsl --list --all | Select-String "Ubuntu-20.04")) {
+          Write-Output "Installing Ubuntu-20.04..."
+          wsl --install -d Ubuntu-20.04 --quiet
+          Start-Sleep -Seconds 30 # Ждём завершения установки
+        } else {
+          Write-Output "Ubuntu-20.04 already installed"
+        }
+        wsl --list --all
         Write-Output "Ubuntu installed in WSL"
       shell: powershell
 
