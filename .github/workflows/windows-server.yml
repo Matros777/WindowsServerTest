@@ -11,17 +11,17 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Download 9Hits Viewer 3.4
+    - name: Download 9Hits Viewer from Google Drive
       run: |
-        Invoke-WebRequest -Uri "https://www.mediafire.com/file/vx7re7ih4q8htz8/9hitsv3-win64.zip/file" -OutFile "9hitsviewer.zip" -ErrorAction Stop
+        Invoke-WebRequest -Uri "https://drive.google.com/uc?export=download&id=1NzzR5v6WLMrpv8zqpwFrRhIBJ8PbcVE1" -OutFile "9hitsviewer.zip" -ErrorAction Stop
         Expand-Archive -Path "9hitsviewer.zip" -DestinationPath "." -Force
-        Write-Output "9Hits Viewer 3.4 downloaded and extracted"
+        Write-Output "9Hits Viewer 3.4 downloaded and extracted from Google Drive"
       shell: powershell
 
     - name: Run 9Hits Viewer
       run: |
         Start-Process -FilePath "./9HitsViewer.exe" -ArgumentList "--token ${{ secrets.NINEHITS_TOKEN }}" -NoNewWindow -RedirectStandardOutput "9hits.log" -RedirectStandardError "9hits_error.log"
-        Start-Sleep -Seconds 60 # Ждём 60 секунд для начального вывода
+        Start-Sleep -Seconds 60 # Ждём 60 секунд для вывода
         Write-Output "9Hits Viewer started. Output:"
         Get-Content -Path "9hits.log" -ErrorAction SilentlyContinue
         Write-Output "Errors (if any):"
