@@ -19,7 +19,7 @@ jobs:
     - name: Run playit.gg and enable RDP
       run: |
         # Запускаем playit.gg с использованием вашего токена
-        Start-Process -FilePath "./playit.exe" -ArgumentList "tcp 3389 -token $env:PLAYIT_TOKEN" -NoNewWindow -RedirectStandardOutput "playit.log"
+        Start-Process -FilePath "./playit.exe" -ArgumentList "start -token $env:PLAYIT_TOKEN" -NoNewWindow -RedirectStandardOutput "playit.log"
         Start-Sleep -Seconds 10 # Даём время на подключение
 
         # Включаем RDP
@@ -39,5 +39,6 @@ jobs:
       run: |
         Write-Output "Server is running. Connect now!"
         Start-Sleep -Seconds 21600 # 6 часов
+
 
 
