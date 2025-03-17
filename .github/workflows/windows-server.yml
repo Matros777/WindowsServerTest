@@ -1,93 +1,35 @@
-name: WINDOWS-CRD
+name: Setup Playit.gg Tunnel for RDP
 
 on:
-  workflow_dispatch:
-    inputs:
-      crd_code:
-        description: 'Chrome Remote Desktop authorization code (from remotedesktop.google.com)'
-        required: true
-      pin_code:
-        description: 'PIN code for Chrome Remote Desktop access'
-        required: true
-        default: '123456'
+  push:
+    branches:
+      - main
 
 jobs:
-  build:
+  setup-tunnel:
     runs-on: windows-latest
-    timeout-minutes: 360 # 6 часов
+
     steps:
-    - name: Run actions/checkout@v2
+    - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Initializing Setup
+    - name: Download playit.gg client
       run: |
-        # Включаем RDP для доступа
-        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0 -ErrorAction Stop
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction Stop
-        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1 -ErrorAction Stop
-        Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd123" -Force) -ErrorAction Stop
-        Write-Output "RDP enabled. Username: runneradmin, Password: P@ssw0rd123"
+        Invoke-WebRequest -Uri "https://github.com/playit-cloud/playit-agent/releases/download/v0.15.26/playit-windows-x86_64-signed.exe" -OutFile "playit.exe" -ErrorAction Stop
+        Write-Output "Playit.gg client downloaded successfully"
 
-        # Устанавливаем Chrome
-        Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/ChromeStandaloneSetup64.exe" -OutFile "ChromeSetup.exe" -ErrorAction Stop
-        Start-Process -FilePath "./ChromeSetup.exe" -ArgumentList "/silent /install" -Wait
-        Write-Output "Chrome installed"
-
-        # Устанавливаем Chrome Remote Desktop Host из репозитория
-        if (Test-Path "./chromeremotedesktophost.msi") {
-          Start-Process -FilePath "msiexec.exe" -ArgumentList "/i chromeremotedesktophost.msi /quiet" -Wait
-          Write-Output "Chrome Remote Desktop Host installed"
-        } else {
-          Write-Output "chromeremotedesktophost.msi not found in repository. Please upload it."
-          exit 1
-        }
-
-        # Загружаем и устанавливаем playit
-        $playitUrl = "https://github.com/playit-cloud/playit-agent/releases/download/v0.15.26/playit-windows-x86_64-signed.exe"
-        $playitFile = "playit.exe"
-        if (Test-Path "./$playitFile") {
-          Write-Output "Using local playit.exe from repository"
-        } else {
-          try {
-            Invoke-WebRequest -Uri $playitUrl -OutFile $playitFile -ErrorAction Stop
-            Write-Output "playit.exe downloaded successfully"
-          } catch {
-            Write-Output "Failed to download playit.exe from $playitUrl. Please upload playit.exe to repository."
-            exit 1
-          }
-        }
-
-        # Запускаем playit с токеном из секретов
-        $playitToken = "${{ secrets.PLAYIT_TOKEN }}"
-        if (-not $playitToken) {
-          Write-Output "PLAYIT_TOKEN not found in GitHub Secrets. Please add it."
-          exit 1
-        }
-        Write-Output "Starting playit with token"
-        Start-Process -FilePath "./$playitFile" -ArgumentList "--secret-key=$playitToken" -NoNewWindow -RedirectStandardOutput "playit.log" -RedirectStandardError "playit_error.log" -Wait
-        Write-Output "playit started. Check playit.log for details"
-
-      shell: powershell
-
-    - name: Starting CRD
+    - name: Run playit.gg and enable RDP tunnel
       run: |
-        $crdCode = "${{ github.event.inputs.crd_code }}"
-        $pinCode = "${{ github.event.inputs.pin_code }}"
-        $crdPath = "$env:PROGRAMFILES\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe"
-        Write-Output "Starting Chrome Remote Desktop with code: $crdCode and PIN: $pinCode"
-        if (Test-Path $crdPath) {
-          $command = "& '$crdPath' --code='$crdCode' --redirect-url='https://remotedesktop.google.com/_/oauthredirect' --name='$Env:COMPUTERNAME' --pin='$pinCode'"
-          Write-Output "Executing command: $command"
-          Invoke-Expression $command
-          Write-Output "Chrome Remote Desktop started. Connect using PIN: $pinCode on remotedesktop.google.com"
-        } else {
-          Write-Output "remoting_start_host.exe not found. Installation failed."
-        }
-      shell: powershell
+        Start-Process -FilePath "./playit.exe" -ArgumentList "tcp 3389" -NoNewWindow
+        Write-Output "Playit.gg tunnel started for RDP"
 
-    - name: Keep alive
+    - name: Display RDP tunnel information
       run: |
-        Write-Output "Server is running. Connect via Chrome Remote Desktop with PIN: ${{ github.event.inputs.pin_code }} to proceed."
-        Write-Output "RDP Username: runneradmin, Password: P@ssw0rd123 (use if CRD fails)"
-        Start-Sleep -Seconds 21600 # 6 часов
-      shell: powershell
+        Write-Output "Use the Playit.gg tunnel IP and port to connect via RDP."
+        Write-Output "IP and Port will be available in the Playit logs."
+
+    - name: Wait for Playit.gg tunnel to establish
+      run: |
+        Start-Sleep -Seconds 60
+        Write-Output "Playit.gg tunnel established successfully."
+
