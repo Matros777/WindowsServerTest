@@ -1,48 +1,42 @@
-name: Setup Windows Server
+name: Windows Server with RDP
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
-    inputs:
-      remote_desktop_code:
-        description: 'Enter your Google Remote Desktop code'
-        required: true
-        type: string
-      remote_desktop_pin:
-        description: 'Enter your Google Remote Desktop PIN'
-        required: true
-        type: string
 
 jobs:
-  setup-windows-server:
+  build:
     runs-on: windows-latest
-
+    timeout-minutes: 360 # 6 часов
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-
-    - name: Install Chocolatey
+    - name: Download ngrok
       run: |
-        Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-
-    - name: Install Google Chrome
-      run: choco install googlechrome -y
-
-    - name: Install Google Remote Desktop
-      run: choco install chromeremotedesktop -y
-
-    - name: Configure Google Remote Desktop
+        Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip" -OutFile "ngrok.zip"
+        Expand-Archive -Path "ngrok.zip" -DestinationPath "."
+        
+    - name: Authenticate ngrok
       run: |
-        $env:CHROME_REMOTE_DESKTOP_HOST = "${{ github.event.inputs.remote_desktop_code }}"
-        $env:CHROME_REMOTE_DESKTOP_PIN = "${{ github.event.inputs.remote_desktop_pin }}"
-        Start-Process "C:\Program Files (x86)\Google\Chrome Remote Desktop\CurrentVersion\remotedesktophost.exe" -ArgumentList "--start-host --code=$env:CHROME_REMOTE_DESKTOP_HOST --pin=$env:CHROME_REMOTE_DESKTOP_PIN" -NoNewWindow -Wait
+        ./ngrok authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+      env:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
 
-    - name: Install other required software
+    - name: Enable RDP
       run: |
-        choco install some-other-software -y
+        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1
+        Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd123" -Force)
 
-    - name: Finalize setup
+    - name: Start ngrok tunnel
       run: |
-        # Add additional setup steps here if needed
+        Start-Process -FilePath "./ngrok" -ArgumentList "tcp 3389" -NoNewWindow
+        Start-Sleep -Seconds 10
+        Invoke-WebRequest -Uri "http://localhost:4040/api/tunnels" -OutFile "tunnels.json"
+        $tunnel = Get-Content "tunnels.json" | ConvertFrom-Json
+        $publicUrl = $tunnel.tunnels[0].public_url
+        Write-Output "RDP Address: $publicUrl"
+        Write-Output "Username: runneradmin"
+        Write-Output "Password: P@ssw0rd123"
+
+    - name: Keep alive
+      run: |
+        Start-Sleep -Seconds 21600 # 6 часов
