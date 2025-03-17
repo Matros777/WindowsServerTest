@@ -18,9 +18,32 @@ jobs:
 
     - name: Run playit.gg and enable RDP
       run: |
-        # Запускаем playit.gg с использованием вашего токена
-        Start-Process -FilePath "./playit.exe" -ArgumentList "--token $env:PLAYIT_TOKEN" -NoNewWindow -RedirectStandardOutput "playit.log"
-        Start-Sleep -Seconds 10 # Даём время на подключение
+        # Получаем токен из секретов GitHub
+        $playitToken = "${{ secrets.PLAYIT_TOKEN }}"
+        if (-not $playitToken) {
+          Write-Output "PLAYIT_TOKEN not found in GitHub Secrets. Please add it."
+          exit 1
+        }
+
+        # Запускаем playit.gg с секретным ключом
+        $playitProcess = Start-Process -FilePath "./playit.exe" -ArgumentList "--secret-key=$playitToken" -NoNewWindow -RedirectStandardOutput "playit.log" -RedirectStandardError "playit_error.log" -PassThru
+        if ($playitProcess) {
+          Write-Output "playit.gg started. Waiting for tunnel setup..."
+        } else {
+          Write-Output "Failed to start playit.exe. Check playit_error.log."
+          exit 1
+        }
+
+        # Даём время на установку туннеля (увеличиваем до 60 секунд)
+        Start-Sleep -Seconds 60
+
+        # Проверяем логи на наличие адреса туннеля
+        $tunnelInfo = Get-Content -Path "playit.log" -ErrorAction SilentlyContinue | Select-String "Allocation"
+        if ($tunnelInfo) {
+          Write-Output "Tunnel info: $tunnelInfo"
+        } else {
+          Write-Output "No tunnel info found in playit.log. Check playit_error.log for errors."
+        }
 
         # Включаем RDP
         Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0 -ErrorAction Stop
@@ -31,7 +54,13 @@ jobs:
 
     - name: Display playit.gg tunnel info
       run: |
-        Write-Output "Use your playit.gg tunnel address from the client: [IP:PORT]"
+        # Читаем адрес туннеля из логов
+        $tunnelAddress = Get-Content -Path "playit.log" -ErrorAction SilentlyContinue | Select-String "Allocation" | ForEach-Object { $_ -replace ".*Allocation: ", "" }
+        if ($tunnelAddress) {
+          Write-Output "Use your playit.gg tunnel address: $tunnelAddress"
+        } else {
+          Write-Output "Tunnel address not found. Check playit.log manually or use playit client."
+        }
         Write-Output "Username: runneradmin"
         Write-Output "Password: P@ssw0rd123"
 
