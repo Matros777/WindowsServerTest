@@ -16,44 +16,24 @@ jobs:
         Invoke-WebRequest -Uri "https://playit.gg/downloads/playit-win_64.exe" -OutFile "playit.exe" -ErrorAction Stop
         Write-Output "playit.gg downloaded"
 
-    - name: Configure Playit.gg with token
-      run: |
-        # Записываем токен в конфиг (секреты передаются через GitHub Secrets)
-        $configPath = "$env:USERPROFILE\AppData\Local\playit_gg\playit.toml"
-        New-Item -ItemType Directory -Path "$env:USERPROFILE\AppData\Local\playit_gg" -Force
-        Set-Content -Path $configPath -Value "[user]`ntoken = `"${{ secrets.PLAYIT_TOKEN }}`""
-
-        Write-Output "playit.gg configured with token"
-
     - name: Run playit.gg and enable RDP
       run: |
-        # Запускаем playit.gg в фоновом режиме
+        # Запускаем playit.gg (предполагаем, что он уже настроен на хосте с туннелем)
         Start-Process -FilePath "./playit.exe" -NoNewWindow -RedirectStandardOutput "playit.log"
-        Start-Sleep -Seconds 10 # Ждём подключения
-
-        # Проверяем, запустился ли Playit.gg
-        if (!(Get-Process | Where-Object { $_.ProcessName -eq "playit" })) {
-            Write-Output "ERROR: Playit.gg не запущен!"
-            exit 1
-        }
+        Start-Sleep -Seconds 10 # Даём время на подключение
 
         # Включаем RDP
         Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0 -ErrorAction Stop
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction Stop
         Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1 -ErrorAction Stop
-
-        # Меняем пароль пользователя (нужен более сложный)
-        $password = ConvertTo-SecureString -AsPlainText "P@ssw0rd!987" -Force
-        Set-LocalUser -Name "runneradmin" -Password $password -ErrorAction Stop
-        Add-LocalGroupMember -Group "Remote Desktop Users" -Member "runneradmin"
-
+        Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd123" -Force) -ErrorAction Stop
         Write-Output "RDP enabled"
 
     - name: Display playit.gg tunnel info
       run: |
         Write-Output "Use your playit.gg tunnel address from the client: [IP:PORT]"
         Write-Output "Username: runneradmin"
-        Write-Output "Password: P@ssw0rd!987"
+        Write-Output "Password: P@ssw0rd123"
 
     - name: Keep alive
       run: |
