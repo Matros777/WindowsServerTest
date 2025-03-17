@@ -1,57 +1,22 @@
-name: Setup Docker and Run 9hits
+name: Windows Server
 
-on:
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Install WSL and Ubuntu
+    - name: Run a simple command
       run: |
-        # Устанавливаем WSL, если оно не установлено
-        wsl --install
-        # Просмотр доступных дистрибутивов WSL
-        wsl --list --online
-        # Устанавливаем Ubuntu 20.04
-        wsl --install -d Ubuntu-20.04
-        Write-Output "Ubuntu 20.04 installed in WSL."
+        Write-Output "Hello from Windows Server!"
+        Get-ChildItem Env:
+    ```
 
-    - name: Install Docker in WSL (Ubuntu)
-      run: |
-        # Устанавливаем Docker в Ubuntu через WSL
-        wsl sudo apt update
-        wsl sudo apt install -y docker.io
-        wsl sudo service docker start
-        Write-Output "Docker installed in WSL."
-
-    - name: Add Docker permissions
-      run: |
-        # Добавляем пользователя в группу Docker для запуска без sudo
-        wsl sudo usermod -aG docker $USER
-        Write-Output "User added to docker group."
-
-    - name: Pull Docker Image 9hitste/app
-      run: |
-        # Загружаем образ с Docker Hub в WSL
-        wsl docker pull 9hitste/app
-        Write-Output "Docker image 9hitste/app pulled."
-
-    - name: Run 9hits Docker Container
-      run: |
-        # Запускаем контейнер с нужными параметрами в WSL
-        wsl docker run -d --network=bridge --name=9hits 9hitste/app /nh.sh --token=dcd7ea6c4acdf7a3d50d78a50ee329a1 --system-session --allow-crypto=no
-        Write-Output "Docker container 9hits started."
-
-    - name: Verify Docker Container Running
-      run: |
-        # Проверяем, что контейнер работает в WSL
-        wsl docker ps
-        Write-Output "Docker container is running."
+- `runs-on: windows-latest` указывает, что будет использоваться последняя версия Windows (обычно Windows Server 2022).
+- `on: [push, workflow_dispatch]` позволяет запускать сервер при пуше в репозиторий или вручную через интерфейс GitHub.
 
 
 
