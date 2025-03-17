@@ -1,34 +1,67 @@
-name: Setup Chrome Remote Desktop
+name: Setup Chrome Remote Desktop for 9Hits
 
 on:
   workflow_dispatch:
     inputs:
       crd_code:
-        description: 'Chrome Remote Desktop authorization code (e.g., 4/0AX4XfW...)'
+        description: 'Chrome Remote Desktop authorization code (e.g., 4/0AX4Xf...)'
         required: true
       pin_code:
         description: 'PIN code for Chrome Remote Desktop access'
         required: true
+        default: '123456'
 
 jobs:
-  setup_crd:
+  build:
     runs-on: windows-latest
+    timeout-minutes: 360 # 6 часов
     steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Enable RDP
+      run: |
+        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0 -ErrorAction Stop
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction Stop
+        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1 -ErrorAction Stop
+        Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd123" -Force) -ErrorAction Stop
+        Write-Output "RDP enabled. Username: runneradmin, Password: P@ssw0rd123"
+      shell: powershell
+
     - name: Install Google Chrome
       run: |
-        Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/ChromeStandaloneSetup64.exe" -OutFile "ChromeSetup.exe"
-        Start-Process -FilePath "ChromeSetup.exe" -ArgumentList "/silent /install" -Wait
+        Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/ChromeStandaloneSetup64.exe" -OutFile "ChromeSetup.exe" -ErrorAction Stop
+        Start-Process -FilePath "./ChromeSetup.exe" -ArgumentList "/silent /install" -Wait
+        Write-Output "Google Chrome installed"
+      shell: powershell
 
     - name: Install Chrome Remote Desktop Host
       run: |
-        Invoke-WebRequest -Uri "https://dl.google.com/chrome-remote-desktop/chromeremotedesktophost.msi" -OutFile "CRDHost.msi"
+        Invoke-WebRequest -Uri "https://dl.google.com/linux/direct/chrome-remote-desktop_current_amd64.deb" -OutFile "CRDHost.msi" -ErrorAction Stop
         Start-Process -FilePath "msiexec.exe" -ArgumentList "/i CRDHost.msi /quiet" -Wait
+        Write-Output "Chrome Remote Desktop Host installed"
+      shell: powershell
 
     - name: Configure Chrome Remote Desktop
       run: |
-        $env:CRD_CODE = '${{ github.event.inputs.crd_code }}'
-        $env:PIN_CODE = '${{ github.event.inputs.pin_code }}'
-        Start-Process -FilePath "$env:ProgramFiles\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe" -ArgumentList "--code=$env:CRD_CODE --redirect-url=https://remotedesktop.google.com/_/oauthredirect --name=$env:COMPUTERNAME --pin=$env:PIN_CODE" -Wait
+        $crdCode = "${{ github.event.inputs.crd_code }}"
+        $pinCode = "${{ github.event.inputs.pin_code }}"
+        $crdPath = "${Env:PROGRAMFILES(X86)}\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe"
+        Write-Output "Configuring Chrome Remote Desktop with code: $crdCode and PIN: $pinCode"
+        if (Test-Path $crdPath) {
+          Start-Process -FilePath $crdPath -ArgumentList "--code=$crdCode --redirect-url=https://remotedesktop.google.com/_/oauthredirect --name=$Env:COMPUTERNAME --pin=$pinCode" -Wait
+          Write-Output "Chrome Remote Desktop configured successfully."
+        } else {
+          Write-Output "remoting_start_host.exe not found. Please check installation."
+        }
+      shell: powershell
+
+    - name: Start 9Hits Server
+      run: |
+        Write-Output "Starting 9Hits server..."
+        Start-Sleep -Seconds 21600 # 6 часов
+      shell: powershell
+
 
 
 
