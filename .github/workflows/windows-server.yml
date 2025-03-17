@@ -11,17 +11,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Install Docker Engine
-      run: |
-        # Устанавливаем Docker Engine для Windows Server
-        Invoke-WebRequest -Uri https://download.docker.com/win/stable/Docker%20for%20Windows%20Server%202019.zip -OutFile DockerForWindows.zip
-        Expand-Archive -Path DockerForWindows.zip -DestinationPath "C:\Program Files\Docker"
-        Write-Output "Docker Engine installed."
-
-    - name: Start Docker Engine
-      run: |
-        Start-Process "C:\Program Files\Docker\docker.exe" -ArgumentList "daemon" -Wait
-        Write-Output "Docker Engine started."
+    - name: Install Docker using Docker Setup Action
+      uses: docker/setup-buildx-action@v2
+      with:
+        version: latest
 
     - name: Pull Docker Image 9hitste/app
       run: |
