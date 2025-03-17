@@ -1,35 +1,43 @@
-name: Setup Playit.gg Tunnel for RDP
+name: Windows Server with RDP via playit.gg
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
-  setup-tunnel:
+  build:
     runs-on: windows-latest
-
+    timeout-minutes: 360 # 6 часов
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-    - name: Download playit.gg client
+    - name: Download playit.gg
       run: |
         Invoke-WebRequest -Uri "https://github.com/playit-cloud/playit-agent/releases/download/v0.15.26/playit-windows-x86_64-signed.exe" -OutFile "playit.exe" -ErrorAction Stop
-        Write-Output "Playit.gg client downloaded successfully"
+        Write-Output "playit.gg downloaded"
 
-    - name: Run playit.gg and enable RDP tunnel
+    - name: Run playit.gg and enable RDP
       run: |
-        Start-Process -FilePath "./playit.exe" -ArgumentList "tcp 3389" -NoNewWindow
-        Write-Output "Playit.gg tunnel started for RDP"
+        # Запускаем playit.gg с использованием вашего токена
+        Start-Process -FilePath "./playit.exe" -ArgumentList "tcp 3389 -token $env:PLAYIT_TOKEN" -NoNewWindow -RedirectStandardOutput "playit.log"
+        Start-Sleep -Seconds 10 # Даём время на подключение
 
-    - name: Display RDP tunnel information
-      run: |
-        Write-Output "Use the Playit.gg tunnel IP and port to connect via RDP."
-        Write-Output "IP and Port will be available in the Playit logs."
+        # Включаем RDP
+        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0 -ErrorAction Stop
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction Stop
+        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1 -ErrorAction Stop
+        Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd123" -Force) -ErrorAction Stop
+        Write-Output "RDP enabled"
 
-    - name: Wait for Playit.gg tunnel to establish
+    - name: Display playit.gg tunnel info
       run: |
-        Start-Sleep -Seconds 60
-        Write-Output "Playit.gg tunnel established successfully."
+        Write-Output "Use your playit.gg tunnel address from the client: [IP:PORT]"
+        Write-Output "Username: runneradmin"
+        Write-Output "Password: P@ssw0rd123"
+
+    - name: Keep alive
+      run: |
+        Write-Output "Server is running. Connect now!"
+        Start-Sleep -Seconds 21600 # 6 часов
+
 
