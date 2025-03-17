@@ -6,7 +6,6 @@ on:
       crd_code:
         description: 'Chrome Remote Desktop authorization code (e.g., 4/0AQSTgQF...)'
         required: true
-        default: '4/0AQSTgQFhIplToIA5QWOJzmwyuN7fIJNLgjhndsp9rN6lXkU3F-xc4CSrKAC_i-3ovGtiZA'
       pin_code:
         description: 'PIN code for Chrome Remote Desktop access'
         required: true
@@ -70,24 +69,9 @@ jobs:
         }
       shell: powershell
 
-    - name: Download 9Hits Viewer
-      run: |
-        $url = "https://drive.google.com/uc?export=download&id=1c6njvmYU0C30isOSUEVZKcv8GXl6E0DH"
-        $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-        $response = Invoke-WebRequest -Uri $url -WebSession $session -UseBasicParsing -ErrorAction Stop
-        $confirmCode = ($response.Content | Select-String 'confirm=([\w-]+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }) -replace '&', '&'
-        if ($confirmCode) {
-          $downloadUrl = "$url&$confirmCode"
-          Invoke-WebRequest -Uri $downloadUrl -OutFile "9hitsviewer.zip" -WebSession $session -ErrorAction Stop
-        } else {
-          Invoke-WebRequest -Uri $url -OutFile "9hitsviewer.zip" -ErrorAction Stop
-        }
-        Write-Output "9Hits Viewer ZIP downloaded to runneradmin's directory"
-      shell: powershell
-
     - name: Keep alive
       run: |
-        Write-Output "Server is running. Connect via Chrome Remote Desktop, RDP, or SSH to launch 9Hits Viewer manually."
+        Write-Output "Server is running. Connect via Chrome Remote Desktop, RDP, or SSH to set up and launch 9Hits Viewer manually."
         Write-Output "RDP Username: runneradmin, Password: P@ssw0rd123"
         Start-Sleep -Seconds 21600 # 6 часов
       shell: powershell
