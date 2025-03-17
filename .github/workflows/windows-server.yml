@@ -1,65 +1,46 @@
-name: Setup SSH Access (Terminal Only)
+name: Setup Docker and Run 9hits
 
 on:
   workflow_dispatch:
-    inputs:
-      ssh_key:
-        description: 'SSH private key for access (base64 encoded)'
-        required: true
 
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 360 # 6 часов
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Enable RDP (Optional - Disabled for terminal-only)
+    - name: Install Docker Engine
       run: |
-        Write-Output "RDP is disabled. Only SSH access is available."
+        # Устанавливаем Docker Engine для Windows Server
+        Invoke-WebRequest -Uri https://download.docker.com/win/stable/Docker%20for%20Windows%20Server%202019.zip -OutFile DockerForWindows.zip
+        Expand-Archive -Path DockerForWindows.zip -DestinationPath "C:\Program Files\Docker"
+        Write-Output "Docker Engine installed."
 
-    - name: Install OpenSSH Server
+    - name: Start Docker Engine
       run: |
-        # Установим OpenSSH сервер для Windows, чтобы был доступ к SSH
-        Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
-        Start-Service -Name sshd
-        Set-Service -Name sshd -StartupType 'Automatic'
-        Write-Output "OpenSSH server installed and started."
+        Start-Process "C:\Program Files\Docker\docker.exe" -ArgumentList "daemon" -Wait
+        Write-Output "Docker Engine started."
 
-    - name: Add SSH key for authentication
+    - name: Pull Docker Image 9hitste/app
       run: |
-        # Декодируем SSH ключ из base64 и добавляем его в систему
-        $key = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("${{ github.event.inputs.ssh_key }}"))
-        $sshDir = "$env:USERPROFILE\.ssh"
-        if (-not (Test-Path -Path $sshDir)) {
-          New-Item -ItemType Directory -Force -Path $sshDir
-        }
-        $keyPath = "$sshDir\id_rsa"
-        $key | Out-File -FilePath $keyPath -Force
-        # Установим правильные права на ключ
-        icacls $keyPath /inheritance:r /grant:r "$($env:USERNAME):(F)"
-        Write-Output "SSH private key added successfully."
+        # Загружаем образ с Docker Hub
+        docker pull 9hitste/app
+        Write-Output "Docker image 9hitste/app pulled."
 
-    - name: Configure SSH Access
+    - name: Run 9hits Docker Container
       run: |
-        # Для Windows 10/Server нужна настройка SSH
-        $sshConfig = "$env:USERPROFILE\.ssh\config"
-        if (-not (Test-Path -Path $sshConfig)) {
-          New-Item -ItemType File -Force -Path $sshConfig
-        }
-        # Добавим конфигурацию для подключения через SSH
-        Add-Content -Path $sshConfig -Value "Host *"
-        Add-Content -Path $sshConfig -Value "  User runneradmin"
-        Add-Content -Path $sshConfig -Value "  IdentityFile $env:USERPROFILE\.ssh\id_rsa"
-        Add-Content -Path $sshConfig -Value "  HostName <server-ip-or-hostname>"
-        Write-Output "SSH configuration updated."
+        # Запускаем контейнер с нужными параметрами, используя --network=bridge
+        docker run -d --network=bridge --name=9hits 9hitste/app /nh.sh --token=dcd7ea6c4acdf7a3d50d78a50ee329a1 --system-session --allow-crypto=no
+        Write-Output "Docker container 9hits started."
 
-    - name: Keep Server Running
+    - name: Verify Docker Container Running
       run: |
-        Write-Output "Server is running. Connect via SSH."
-        Start-Sleep -Seconds 21600 # 6 часов
-      shell: powershell
+        # Проверяем, что контейнер работает
+        docker ps
+        Write-Output "Docker container is running."
+
 
 
 
