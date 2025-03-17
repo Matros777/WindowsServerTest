@@ -1,73 +1,35 @@
-name: Windows Server with RDP via playit.gg
+name: Setup Chrome Remote Desktop
 
 on:
   workflow_dispatch:
+    inputs:
+      crd_code:
+        description: 'Chrome Remote Desktop authorization code (e.g., 4/0AX4XfW...)'
+        required: true
+      pin_code:
+        description: 'PIN code for Chrome Remote Desktop access'
+        required: true
 
 jobs:
-  build:
+  setup_crd:
     runs-on: windows-latest
-    timeout-minutes: 360 # 6 часов
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
-    - name: Download playit.gg
+    - name: Install Google Chrome
       run: |
-        Invoke-WebRequest -Uri "https://github.com/playit-cloud/playit-agent/releases/download/v0.15.26/playit-windows-x86_64-signed.exe" -OutFile "playit.exe" -ErrorAction Stop
-        Write-Output "playit.gg downloaded"
+        Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/ChromeStandaloneSetup64.exe" -OutFile "ChromeSetup.exe"
+        Start-Process -FilePath "ChromeSetup.exe" -ArgumentList "/silent /install" -Wait
 
-    - name: Run playit.gg and enable RDP
+    - name: Install Chrome Remote Desktop Host
       run: |
-        # Получаем токен из секретов GitHub
-        $playitToken = "${{ secrets.PLAYIT_TOKEN }}"
-        if (-not $playitToken) {
-          Write-Output "PLAYIT_TOKEN not found in GitHub Secrets. Please add it."
-          exit 1
-        }
+        Invoke-WebRequest -Uri "https://dl.google.com/chrome-remote-desktop/chromeremotedesktophost.msi" -OutFile "CRDHost.msi"
+        Start-Process -FilePath "msiexec.exe" -ArgumentList "/i CRDHost.msi /quiet" -Wait
 
-        # Запускаем playit.gg с секретным ключом
-        $playitProcess = Start-Process -FilePath "./playit.exe" -ArgumentList "--secret-key=$playitToken" -NoNewWindow -RedirectStandardOutput "playit.log" -RedirectStandardError "playit_error.log" -PassThru
-        if ($playitProcess) {
-          Write-Output "playit.gg started. Waiting for tunnel setup..."
-        } else {
-          Write-Output "Failed to start playit.exe. Check playit_error.log."
-          exit 1
-        }
-
-        # Даём время на установку туннеля (увеличиваем до 60 секунд)
-        Start-Sleep -Seconds 60
-
-        # Проверяем логи на наличие адреса туннеля
-        $tunnelInfo = Get-Content -Path "playit.log" -ErrorAction SilentlyContinue | Select-String "Allocation"
-        if ($tunnelInfo) {
-          Write-Output "Tunnel info: $tunnelInfo"
-        } else {
-          Write-Output "No tunnel info found in playit.log. Check playit_error.log for errors."
-        }
-
-        # Включаем RDP
-        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0 -ErrorAction Stop
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction Stop
-        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1 -ErrorAction Stop
-        Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd123" -Force) -ErrorAction Stop
-        Write-Output "RDP enabled"
-
-    - name: Display playit.gg tunnel info
+    - name: Configure Chrome Remote Desktop
       run: |
-        # Читаем адрес туннеля из логов
-        $tunnelAddress = Get-Content -Path "playit.log" -ErrorAction SilentlyContinue | Select-String "Allocation" | ForEach-Object { $_ -replace ".*Allocation: ", "" }
-        if ($tunnelAddress) {
-          Write-Output "Use your playit.gg tunnel address: $tunnelAddress"
-        } else {
-          Write-Output "Tunnel address not found. Check playit.log manually or use playit client."
-        }
-        Write-Output "Username: runneradmin"
-        Write-Output "Password: P@ssw0rd123"
+        $env:CRD_CODE = '${{ github.event.inputs.crd_code }}'
+        $env:PIN_CODE = '${{ github.event.inputs.pin_code }}'
+        Start-Process -FilePath "$env:ProgramFiles\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe" -ArgumentList "--code=$env:CRD_CODE --redirect-url=https://remotedesktop.google.com/_/oauthredirect --name=$env:COMPUTERNAME --pin=$env:PIN_CODE" -Wait
 
-    - name: Keep alive
-      run: |
-        Write-Output "Server is running. Connect now!"
-        Start-Sleep -Seconds 21600 # 6 часов
 
 
 
